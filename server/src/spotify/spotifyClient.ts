@@ -1,4 +1,4 @@
-import { getAppAccessToken } from './spotifyAuth';
+import { getUserAccessToken } from './spotifyAuth';
 
 const API_BASE = 'https://api.spotify.com/v1';
 
@@ -52,7 +52,7 @@ export interface RawPlaylistData {
 }
 
 async function spotifyFetch<T>(url: string): Promise<T> {
-  const token = await getAppAccessToken();
+  const token = await getUserAccessToken();
 
   const response = await fetch(url, {
     headers: { Authorization: `Bearer ${token}` }
