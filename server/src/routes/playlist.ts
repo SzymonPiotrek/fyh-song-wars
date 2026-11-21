@@ -23,7 +23,7 @@ router.post('/import', async (req: Request, res: Response) => {
     const playlist = await importPlaylist(parsed.data.playlistUrl);
     const characters = playlist.songs.map(generateCharacter);
     const relationships = calculateRelationships(playlist.songs);
-    const arena = await generateArena(playlist.coverArtUrl, 1920, 1080);
+    const arena = await generateArena(playlist.id, playlist.coverArtUrl, 1920, 1080);
     res.json({ playlist, characters, relationships, arena });
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Unknown error';

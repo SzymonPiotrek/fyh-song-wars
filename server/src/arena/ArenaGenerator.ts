@@ -1,18 +1,37 @@
 import sharp from 'sharp';
 import { Arena, ArenaTheme, ArenaColors, ArenaObstacle } from '../../../shared/types/Arena';
-import { hashString, createRandom, pick } from '../utils/deterministicRandom';
+import { hashString, createRandom } from '../utils/deterministicRandom';
+import { analyseCoverArt, CoverArtTheme } from './CoverArtAnalyser';
 
-async function getImageStats(imageUrl: string): Promise<{ r: number; g: number; b: number; entropy: number }> {
-  if (!imageUrl) return { r: 80, g: 80, b: 100, entropy: 4 };
+async function fetchImageBuffer(imageUrl: string): Promise<Buffer | null> {
+  if (!imageUrl) return null;
 
   try {
     const response = await fetch(imageUrl);
-    const buffer = Buffer.from(await response.arrayBuffer());
-    const stats = await sharp(buffer).stats();
+    return Buffer.from(await response.arrayBuffer());
+  } catch {
+    return null;
+  }
+}
+
+async function getImageStats(imageBuffer: Buffer | null): Promise<{ r: number; g: number; b: number; entropy: number }> {
+  if (!imageBuffer) return { r: 80, g: 80, b: 100, entropy: 4 };
+
+  try {
+    const stats = await sharp(imageBuffer).stats();
     return { ...stats.dominant, entropy: stats.entropy };
   } catch {
     return { r: 80, g: 80, b: 100, entropy: 4 };
   }
+}
+
+function hexToRgb(hex: string): { r: number; g: number; b: number } {
+  const clean = hex.replace('#', '');
+  return {
+    r: parseInt(clean.substring(0, 2), 16),
+    g: parseInt(clean.substring(2, 4), 16),
+    b: parseInt(clean.substring(4, 6), 16)
+  };
 }
 
 function rgbToHsl(r: number, g: number, b: number): { h: number; s: number; l: number } {
@@ -50,6 +69,13 @@ function hslToHex(h: number, s: number, l: number): string {
   return `#${toHex(0)}${toHex(8)}${toHex(4)}`;
 }
 
+function adjustLightness(hex: string, lightness: number, saturation?: number): string {
+  const { r, g, b } = hexToRgb(hex);
+  const hsl = rgbToHsl(r, g, b);
+  return hslToHex(hsl.h, saturation ?? hsl.s, lightness);
+}
+
+// Falls back to a hue-based guess when the AI couldn't identify a theme
 function pickTheme(h: number, s: number, l: number): ArenaTheme {
   if (l > 70 && s < 40) return ArenaTheme.Floating;
   if (s > 70 && l > 50) return ArenaTheme.Neon;
@@ -62,6 +88,21 @@ function pickTheme(h: number, s: number, l: number): ArenaTheme {
   return ArenaTheme.Volcanic;
 }
 
+function pickThemeFromAnalysis(theme: CoverArtTheme, h: number, s: number, l: number): ArenaTheme {
+  const text = `${theme.overallTheme} ${theme.moodKeywords.join(' ')}`.toLowerCase();
+
+  if (theme.dangerLevel > 0.7 || /fire|lava|volcan|explo/.test(text)) return ArenaTheme.Volcanic;
+  if (/neon|glow|electric|synth/.test(text)) return ArenaTheme.Neon;
+  if (/forest|nature|leaf|green|organic/.test(text)) return ArenaTheme.Forest;
+  if (/sky|cloud|float|dream|pastel/.test(text)) return ArenaTheme.Floating;
+  if (/desert|sand|dust|dry/.test(text)) return ArenaTheme.Desert;
+  if (/ocean|water|wave|sea/.test(text)) return ArenaTheme.Ocean;
+  if (/space|galaxy|cosmic|star/.test(text)) return ArenaTheme.Space;
+  if (/cyber|tech|digital|futur/.test(text)) return ArenaTheme.Cyberpunk;
+
+  return pickTheme(h, s, l);
+}
+
 function buildColors(hue: number): ArenaColors {
   return {
     primary: hslToHex(hue, 55, 25),
@@ -72,17 +113,45 @@ function buildColors(hue: number): ArenaColors {
   };
 }
 
-const OBSTACLE_TYPES: ArenaObstacle['type'][] = ['platform', 'wall', 'hazard', 'boost'];
+function buildColorsFromPalette(palette: string[]): ArenaColors {
+  const validColors = palette.filter(c => /^#[0-9a-fA-F]{6}$/.test(c));
+  if (validColors.length === 0) return buildColors(220);
 
-function buildObstacles(coverArtUrl: string, entropy: number, colors: ArenaColors, width: number, height: number): ArenaObstacle[] {
+  const primary = validColors[0];
+  const accent = validColors[1] ?? validColors[0];
+
+  return {
+    primary: adjustLightness(primary, 25),
+    secondary: adjustLightness(primary, 18),
+    accent: adjustLightness(accent, 50, 70),
+    ground: adjustLightness(primary, 12),
+    sky: adjustLightness(primary, 20)
+  };
+}
+
+function pickObstacleType(dangerLevel: number, random: () => number): ArenaObstacle['type'] {
+  const hazardWeight = 0.15 + dangerLevel * 0.5;
+  const wallWeight = 0.2 + dangerLevel * 0.2;
+  const boostWeight = Math.max(0.05, 0.25 - dangerLevel * 0.15);
+
+  const roll = random();
+  if (roll < hazardWeight) return 'hazard';
+  if (roll < hazardWeight + wallWeight) return 'wall';
+  if (roll < hazardWeight + wallWeight + boostWeight) return 'boost';
+  return 'platform';
+}
+
+function buildObstacles(coverArtUrl: string, entropy: number, theme: CoverArtTheme, colors: ArenaColors, width: number, height: number): ArenaObstacle[] {
   const random = createRandom(hashString(coverArtUrl || 'default-arena'));
-  const count = Math.round(Math.min(7, Math.max(3, entropy)));
+  const count = Math.round(Math.min(9, Math.max(3, entropy + theme.dangerLevel * 3)));
   const margin = 120;
+  // sharp/angular covers get more erratic, varied obstacle sizes; round covers get calmer, uniform ones
+  const sizeVariance = theme.shapes === 'sharp' ? 1.6 : theme.shapes === 'round' ? 0.6 : 1;
 
   const obstacles: ArenaObstacle[] = [];
   for (let i = 0; i < count; i++) {
-    const obstacleWidth = 50 + random() * 90;
-    const obstacleHeight = 40 + random() * 70;
+    const obstacleWidth = 40 + random() * 100 * sizeVariance;
+    const obstacleHeight = 30 + random() * 80 * sizeVariance;
 
     obstacles.push({
       id: `obstacle-${i}`,
@@ -90,7 +159,7 @@ function buildObstacles(coverArtUrl: string, entropy: number, colors: ArenaColor
       y: margin + random() * (height - margin * 2 - obstacleHeight),
       width: obstacleWidth,
       height: obstacleHeight,
-      type: pick(OBSTACLE_TYPES, random),
+      type: pickObstacleType(theme.dangerLevel, random),
       color: colors.accent
     });
   }
@@ -98,21 +167,26 @@ function buildObstacles(coverArtUrl: string, entropy: number, colors: ArenaColor
   return obstacles;
 }
 
-export async function generateArena(coverArtUrl: string, width: number, height: number): Promise<Arena> {
-  const { r, g, b, entropy } = await getImageStats(coverArtUrl);
+export async function generateArena(playlistId: string, coverArtUrl: string, width: number, height: number): Promise<Arena> {
+  const imageBuffer = await fetchImageBuffer(coverArtUrl);
+  const [theme, { r, g, b, entropy }] = await Promise.all([
+    analyseCoverArt(playlistId, imageBuffer),
+    getImageStats(imageBuffer)
+  ]);
   const { h, s, l } = rgbToHsl(r, g, b);
-  const theme = pickTheme(h, s, l);
-  const colors = buildColors(h);
-  const obstacles = buildObstacles(coverArtUrl, entropy, colors, width, height);
+
+  const arenaTheme = pickThemeFromAnalysis(theme, h, s, l);
+  const colors = theme.colorScheme.length > 0 ? buildColorsFromPalette(theme.colorScheme) : buildColors(h);
+  const obstacles = buildObstacles(coverArtUrl, entropy, theme, colors, width, height);
 
   return {
     id: `arena-${Date.now()}`,
-    theme,
+    theme: arenaTheme,
     colors,
     width,
     height,
     obstacles,
     backgroundGradient: { top: colors.sky, bottom: colors.ground },
-    decorations: []
+    decorations: theme.moodKeywords
   };
 }
