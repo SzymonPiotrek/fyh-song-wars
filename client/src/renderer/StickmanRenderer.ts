@@ -44,9 +44,6 @@ export class StickmanRenderer {
   render(characters: Character[], arena: Arena, delta: number = 1, isEntrance: boolean = false, ragdollParts?: Map<string, Matter.Body[]>) {
     this.container.removeChildren();
 
-    // Draw arena background
-    this.drawArena(arena);
-
     const deltaSeconds = delta / 60;
 
     // Draw each character
@@ -148,32 +145,59 @@ export class StickmanRenderer {
     hbFill.endFill();
     container.addChild(hbFill);
 
-    // Name label
-    const nameText = new Text(character.song.title, {
-      fontSize: 10,
-      fill: '#ffffff',
-      fontWeight: 'bold'
-    });
-    nameText.anchor.set(0.5, 0);
-    nameText.x = 0;
-    nameText.y = -63;
-    container.addChild(nameText);
+    // Name label with outline for readability
+    const nameLabel = this.createNameLabel(character);
+    nameLabel.x = 0;
+    nameLabel.y = -63;
+    container.addChild(nameLabel);
 
     return container;
   }
 
-  private drawArena(arena: Arena) {
-    const bg = new Graphics();
-    bg.beginFill(parseInt(arena.colors.ground.replace('#', ''), 16));
-    bg.drawRect(0, 0, arena.width, arena.height);
-    bg.endFill();
-    this.container.addChild(bg);
+  /**
+   * Create a name label for a character that is readable against any background.
+   * Uses a black stroke outline and subtle background for contrast.
+   */
+  private createNameLabel(character: Character): PIXI.Container {
+    const container = new Container();
 
-    // Draw border
-    const border = new Graphics();
-    border.lineStyle(4, parseInt(arena.colors.accent.replace('#', ''), 16));
-    border.drawRect(0, 0, arena.width, arena.height);
-    this.container.addChild(border);
+    // Safely extract the name as a string
+    const title = typeof character.song?.title === 'string'
+      ? character.song.title
+      : String(character.song?.title ?? 'Unknown');
+    const artist = typeof character.song?.artist === 'string'
+      ? character.song.artist
+      : '';
+
+    const displayName = artist ? `${title} — ${artist}` : title;
+
+    // Text with black stroke outline for contrast
+    const text = new Text(displayName, {
+      fontSize: 11,
+      fill: '#ffffff',
+      fontWeight: 'bold',
+      fontFamily: 'Inter, Arial, sans-serif',
+      stroke: '#000000',
+      strokeThickness: 3
+    });
+    text.anchor.set(0.5, 0.5);
+
+    // Semi-transparent background pill behind the text
+    const bgPadding = 6;
+    const bg = new Graphics();
+    bg.beginFill(0x000000, 0.55);
+    bg.drawRoundedRect(
+      -text.width / 2 - bgPadding,
+      -8,
+      text.width + bgPadding * 2,
+      16 + bgPadding,
+      4
+    );
+    bg.endFill();
+    container.addChild(bg);
+
+    container.addChild(text);
+    return container;
   }
 
   // Draws a two-segment limb (e.g. upper arm + forearm) from an origin point,
@@ -400,16 +424,11 @@ export class StickmanRenderer {
     hbFill.endFill();
     container.addChild(hbFill);
 
-    // Name label
-    const nameText = new Text(character.song.title, {
-      fontSize: 10,
-      fill: '#ffffff',
-      fontWeight: 'bold'
-    });
-    nameText.anchor.set(0.5, 0);
-    nameText.x = 0;
-    nameText.y = -63;
-    container.addChild(nameText);
+    // Name label with outline for readability
+    const nameLabel = this.createNameLabel(character);
+    nameLabel.x = 0;
+    nameLabel.y = -63;
+    container.addChild(nameLabel);
 
     this.characterContainers.set(character.id, container);
 

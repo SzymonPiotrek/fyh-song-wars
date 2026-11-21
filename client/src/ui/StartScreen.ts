@@ -553,7 +553,7 @@ export function showStartScreen(onReady: (result: ImportResult) => void) {
     }
 
     button.disabled = true;
-    status.textContent = '⚔️ Loading arena and fighters...';
+    status.textContent = '⚔️ Generating arena from album artwork...';
     status.style.color = '#1DB954';
 
     try {

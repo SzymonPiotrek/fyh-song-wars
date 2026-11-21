@@ -3,8 +3,125 @@ import { BattleManager } from './game/systems/BattleManager';
 import { StickmanRenderer } from './renderer/StickmanRenderer';
 import { ArenaScene } from './game/scenes/ArenaScene';
 import { showStartScreen, ImportResult } from './ui/StartScreen';
+import { ArenaTheme } from 'shared/Arena';
+
+const THEME_LABELS: Record<ArenaTheme, string> = {
+  [ArenaTheme.Volcanic]: '🌋 Volcanic Arena',
+  [ArenaTheme.Neon]: '💡 Neon Arena',
+  [ArenaTheme.Forest]: '🌲 Forest Arena',
+  [ArenaTheme.Floating]: '☁️ Floating Arena',
+  [ArenaTheme.Desert]: '🏜️ Desert Arena',
+  [ArenaTheme.Ocean]: '🌊 Ocean Arena',
+  [ArenaTheme.Space]: '🌌 Space Arena',
+  [ArenaTheme.Cyberpunk]: '🤖 Cyberpunk Arena'
+};
+
+function showArenaIntro(arena: ImportResult['arena']): Promise<void> {
+  return new Promise((resolve) => {
+    const overlay = document.getElementById('ui-overlay');
+    if (!overlay) {
+      resolve();
+      return;
+    }
+
+    const themeLabel = THEME_LABELS[arena.theme] ?? '⚔️ Battle Arena';
+    const moodText = arena.moodKeywords.length > 0
+      ? arena.moodKeywords.slice(0, 5).join(' • ')
+      : 'Prepare for battle';
+    const bgColor = arena.colors.primary || '#1a1a2e';
+    const accentColor = arena.colors.accent || '#aa3bff';
+
+    overlay.innerHTML = `
+      <style>
+        .arena-intro {
+          position: absolute;
+          top: 0;
+          left: 0;
+          width: 100%;
+          height: 100%;
+          background: radial-gradient(ellipse at center, ${bgColor} 0%, #000000 100%);
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          flex-direction: column;
+          animation: arena-intro-fade-in 0.5s ease-out forwards;
+          font-family: 'Inter', 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+        .arena-intro-theme {
+          font-family: 'Orbitron', 'Segoe UI', sans-serif;
+          font-size: 48px;
+          font-weight: 900;
+          color: ${accentColor};
+          text-shadow: 0 0 30px ${accentColor}80, 0 0 60px ${accentColor}40;
+          margin-bottom: 20px;
+          animation: arena-intro-scale 0.6s ease-out forwards;
+          opacity: 0;
+          transform: scale(0.8);
+        }
+        .arena-intro-mood {
+          font-size: 18px;
+          color: #b0a0c0;
+          letter-spacing: 3px;
+          text-transform: uppercase;
+          animation: arena-intro-fade-up 0.6s ease-out 0.3s forwards;
+          opacity: 0;
+          transform: translateY(15px);
+        }
+        .arena-intro-architecture {
+          font-size: 14px;
+          color: #807090;
+          margin-top: 15px;
+          animation: arena-intro-fade-up 0.6s ease-out 0.5s forwards;
+          opacity: 0;
+          transform: translateY(10px);
+        }
+        @keyframes arena-intro-fade-in {
+          from { opacity: 0; }
+          to { opacity: 1; }
+        }
+        @keyframes arena-intro-scale {
+          0% { opacity: 0; transform: scale(0.8); }
+          60% { opacity: 1; transform: scale(1.05); }
+          100% { opacity: 1; transform: scale(1); }
+        }
+        @keyframes arena-intro-fade-up {
+          from { opacity: 0; transform: translateY(15px); }
+          to { opacity: 1; transform: translateY(0); }
+        }
+        @keyframes arena-intro-fade-out {
+          from { opacity: 1; }
+          to { opacity: 0; }
+        }
+      </style>
+      <div class="arena-intro">
+        <div class="arena-intro-theme">${themeLabel}</div>
+        <div class="arena-intro-mood">${moodText}</div>
+        ${arena.architecture ? `<div class="arena-intro-architecture">${arena.architecture.charAt(0).toUpperCase() + arena.architecture.slice(1)} Architecture</div>` : ''}
+      </div>
+    `;
+
+    // Auto-advance after 2.5 seconds
+    setTimeout(() => {
+      const intro = overlay.querySelector('.arena-intro');
+      if (intro) {
+        (intro as HTMLElement).style.animation = 'arena-intro-fade-out 0.5s ease-out forwards';
+      }
+      setTimeout(() => {
+        overlay.innerHTML = '';
+        resolve();
+      }, 500);
+    }, 2500);
+  });
+}
 
 function startBattle(result: ImportResult) {
+  // Show arena introduction first, then start the battle
+  showArenaIntro(result.arena).then(() => {
+    startBattleGame(result);
+  });
+}
+
+function startBattleGame(result: ImportResult) {
   // Initialize PixiJS application (v7 synchronous)
   const app = new PIXI.Application({
     width: window.innerWidth,

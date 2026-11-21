@@ -79,7 +79,11 @@ export class BattleManager {
         top: '#1a1a2e',
         bottom: '#0a0a1a'
       },
-      decorations: []
+      decorations: [],
+      architecture: 'futuristic',
+      floorPattern: 'neon',
+      ambientParticles: { color: '#0f3460', speed: 1, density: 0.5 },
+      moodKeywords: []
     };
   }
 
