@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc && vite build",
-    "server": "tsx server/src/index.ts",
+    "server": "tsx --env-file=.env server/src/index.ts",
     "test": "vitest"
   },
   "dependencies": {

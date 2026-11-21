@@ -11,6 +11,9 @@ build/
 .env.local
 .env.*.local
 
+# Generated data
+server/data/
+
 # IDE
 .idea/
 *.iml
