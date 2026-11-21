@@ -7,23 +7,26 @@ const { Container, Graphics, Text } = PIXI;
 export class StickmanRenderer {
   private container: PIXI.Container;
   private characterContainers: Map<string, PIXI.Container> = new Map();
+  private walkPhase: Map<string, number> = new Map();
 
   constructor(stage: PIXI.Container) {
     this.container = new Container();
     stage.addChild(this.container);
   }
 
-  render(characters: Character[], arena: Arena) {
+  render(characters: Character[], arena: Arena, delta: number = 1) {
     this.container.removeChildren();
 
     // Draw arena background
     this.drawArena(arena);
 
+    const deltaSeconds = delta / 60;
+
     // Draw each character
     for (const character of characters) {
       if (!character.alive) continue;
 
-      const charContainer = this.drawStickman(character);
+      const charContainer = this.drawStickman(character, deltaSeconds);
       this.container.addChild(charContainer);
     }
   }
@@ -42,15 +45,28 @@ export class StickmanRenderer {
     this.container.addChild(border);
   }
 
-  private drawStickman(character: Character): PIXI.Container {
+  private drawStickman(character: Character, deltaSeconds: number): PIXI.Container {
     const container = new Container();
     container.x = character.position.x;
-    container.y = character.position.y;
     container.scale.set(character.size);
 
     const color = parseInt(character.color.replace('#', ''), 16);
     const secondaryColor = parseInt(character.secondaryColor.replace('#', ''), 16);
     const lineWeight = 3;
+
+    // Advance a walk cycle based on how fast the character is actually moving,
+    // so legs/arms swing in step with movement instead of staying in a static pose
+    const speed = Math.sqrt(character.velocity.x ** 2 + character.velocity.y ** 2);
+    const isWalking = speed > 10;
+    const cycleSpeed = isWalking ? 6 + Math.min(6, speed / 40) : 1.5;
+    const phase = (this.walkPhase.get(character.id) ?? 0) + deltaSeconds * cycleSpeed;
+    this.walkPhase.set(character.id, phase);
+
+    const legSwing = isWalking ? Math.sin(phase) * 10 : Math.sin(phase) * 1.5;
+    const armSwing = isWalking ? Math.sin(phase + Math.PI) * 6 : 0;
+    const bob = isWalking ? Math.abs(Math.sin(phase)) * 3 : Math.sin(phase) * 1;
+
+    container.y = character.position.y - bob;
 
     const g = new Graphics();
 
@@ -70,7 +86,7 @@ export class StickmanRenderer {
     if (character.facing === 'right') {
       // Left arm (back)
       g.moveTo(0, -10);
-      g.lineTo(-15, -10 + Math.sin(armAngle) * 10);
+      g.lineTo(-15 + armSwing, -10 + Math.sin(armAngle) * 10);
 
       // Right arm (front, with weapon)
       g.moveTo(0, -10);
@@ -94,7 +110,7 @@ export class StickmanRenderer {
 
       // Right arm (back)
       g.moveTo(0, -10);
-      g.lineTo(15, -10 + Math.sin(armAngle) * 10);
+      g.lineTo(15 - armSwing, -10 + Math.sin(armAngle) * 10);
 
       // Weapon
       this.drawWeapon(g, character, -15, -5, secondaryColor);
@@ -102,10 +118,10 @@ export class StickmanRenderer {
 
     // Legs
     g.moveTo(0, 10);
-    g.lineTo(-10, 30);
+    g.lineTo(-10 + legSwing, 30);
 
     g.moveTo(0, 10);
-    g.lineTo(10, 30);
+    g.lineTo(10 - legSwing, 30);
 
     container.addChild(g);
 

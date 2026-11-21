@@ -94,12 +94,18 @@ export class CharacterAI {
     const distance = Math.sqrt(dx * dx + dy * dy);
 
     if (distance > 0) {
-      const speed = character.stats.movementSpeed * deltaTime;
-      character.velocity.x = (dx / distance) * speed;
-      character.velocity.y = (dy / distance) * speed;
+      const desiredVx = (dx / distance) * character.stats.movementSpeed;
+      const desiredVy = (dy / distance) * character.stats.movementSpeed;
 
-      character.position.x += character.velocity.x;
-      character.position.y += character.velocity.y;
+      // Steer smoothly toward the desired direction instead of snapping to it
+      // instantly, so characters curve into a turn rather than teleporting their heading
+      const steerStrength = 5;
+      const t = Math.min(1, steerStrength * deltaTime);
+      character.velocity.x += (desiredVx - character.velocity.x) * t;
+      character.velocity.y += (desiredVy - character.velocity.y) * t;
+
+      character.position.x += character.velocity.x * deltaTime;
+      character.position.y += character.velocity.y * deltaTime;
     }
   }
 

@@ -70,7 +70,7 @@ function startBattle(result: ImportResult) {
   // Game loop
   app.ticker.add((delta) => {
     battleManager.update(delta);
-    renderer.render(battleManager.getCharacters(), battleManager.getArena());
+    renderer.render(battleManager.getCharacters(), battleManager.getArena(), delta);
     arenaScene.render(battleManager.getArena());
   });
 }
