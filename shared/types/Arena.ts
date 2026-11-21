@@ -27,6 +27,19 @@ export interface ArenaObstacle {
   color: string;
 }
 
+export interface ArenaDecoration {
+  type: 'particle' | 'structure' | 'foreground' | 'background';
+  config: Record<string, unknown>;
+}
+
+export interface ArenaAmbientParticles {
+  color: string;
+  speed: number;
+  density: number;
+}
+
+export type FloorPattern = 'grid' | 'stone' | 'lava' | 'water' | 'grass' | 'neon' | 'clouds';
+
 export interface Arena {
   id: string;
   theme: ArenaTheme;
@@ -38,5 +51,9 @@ export interface Arena {
     top: string;
     bottom: string;
   };
-  decorations: string[];  // visual elements (particles, effects)
+  decorations: ArenaDecoration[];  // structured decorations
+  architecture: string;            // e.g., 'industrial', 'natural', 'futuristic', 'ancient'
+  floorPattern: FloorPattern;
+  ambientParticles: ArenaAmbientParticles;
+  moodKeywords: string[];          // pass through for arena intro text
 }
