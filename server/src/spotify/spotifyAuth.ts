@@ -1,5 +1,9 @@
+import { mkdirSync, readFileSync, writeFileSync } from 'fs';
+import path from 'path';
+
 const REDIRECT_URI = 'http://127.0.0.1:3001/callback';
 const SCOPES = 'playlist-read-private playlist-read-collaborative';
+const TOKENS_PATH = path.resolve('server/data/spotify-tokens.json');
 
 interface UserTokens {
   accessToken: string;
@@ -7,8 +11,21 @@ interface UserTokens {
   expiresAt: number;
 }
 
+function loadTokensFromDisk(): UserTokens | null {
+  try {
+    return JSON.parse(readFileSync(TOKENS_PATH, 'utf-8'));
+  } catch {
+    return null;
+  }
+}
+
+function saveTokensToDisk(tokens: UserTokens) {
+  mkdirSync(path.dirname(TOKENS_PATH), { recursive: true });
+  writeFileSync(TOKENS_PATH, JSON.stringify(tokens));
+}
+
 // Single-user hackathon scope: one logged-in Spotify account at a time.
-let userTokens: UserTokens | null = null;
+let userTokens: UserTokens | null = loadTokensFromDisk();
 
 function getClientCredentials(): { clientId: string; clientSecret: string } {
   const clientId = process.env.SPOTIFY_CLIENT_ID;
@@ -64,6 +81,7 @@ export async function exchangeCodeForTokens(code: string): Promise<void> {
     refreshToken: data.refresh_token,
     expiresAt: Date.now() + (data.expires_in - 60) * 1000
   };
+  saveTokensToDisk(userTokens);
 }
 
 async function refreshAccessToken(): Promise<void> {
@@ -96,6 +114,7 @@ async function refreshAccessToken(): Promise<void> {
     refreshToken: data.refresh_token ?? userTokens.refreshToken,
     expiresAt: Date.now() + (data.expires_in - 60) * 1000
   };
+  saveTokensToDisk(userTokens);
 }
 
 export function isLoggedIn(): boolean {

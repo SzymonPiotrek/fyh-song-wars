@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { importPlaylist } from '../playlist/PlaylistManager';
 import { generateCharacter } from '../characters/CharacterGenerator';
 import { calculateRelationships } from '../relationships/RelationshipManager';
+import { generateArena } from '../arena/ArenaGenerator';
 
 const router = Router();
 
@@ -22,7 +23,8 @@ router.post('/import', async (req: Request, res: Response) => {
     const playlist = await importPlaylist(parsed.data.playlistUrl);
     const characters = playlist.songs.map(generateCharacter);
     const relationships = calculateRelationships(playlist.songs);
-    res.json({ playlist, characters, relationships });
+    const arena = await generateArena(playlist.coverArtUrl, 1920, 1080);
+    res.json({ playlist, characters, relationships, arena });
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Unknown error';
     res.status(502).json({ error: message });

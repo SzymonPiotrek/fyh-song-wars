@@ -1,4 +1,4 @@
-import { Character } from '../../../shared/types/Character';
+import { Character } from '../../../../shared/types/Character';
 import { CombatSystem } from './CombatSystem';
 
 export class CharacterAI {

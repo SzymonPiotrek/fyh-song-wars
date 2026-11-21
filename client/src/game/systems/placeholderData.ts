@@ -1,5 +1,5 @@
-import { Character, CombatStats, WeaponType, AbilityType } from '../../../shared/types/Character';
-import { Song, SongCharacteristics, Mood, Genre } from '../../../shared/types/Song';
+import { Character, CombatStats, WeaponType, AbilityType } from '../../../../shared/types/Character';
+import { Song, SongCharacteristics, Mood, Genre } from '../../../../shared/types/Song';
 
 function createPlaceholderSong(
   id: string,

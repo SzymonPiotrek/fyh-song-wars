@@ -1,6 +1,6 @@
 import * as Matter from 'matter-js';
-import { Character } from '../../../shared/types/Character';
-import { Arena } from '../../../shared/types/Arena';
+import { Character } from '../../../../shared/types/Character';
+import { Arena } from '../../../../shared/types/Arena';
 
 export class PhysicsSystem {
   private engine: Matter.Engine;

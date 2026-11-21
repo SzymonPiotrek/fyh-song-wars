@@ -66,14 +66,33 @@ function deriveColors(mood: Mood, danceability: number, valence: number, random:
   };
 }
 
-function deriveStats(song: Song): CombatStats {
+// how heavy each weapon is (0 = lightest/fastest, 1 = heaviest/slowest)
+const WEAPON_WEIGHT: Record<WeaponType, number> = {
+  [WeaponType.Dagger]: 0.1,
+  [WeaponType.Whip]: 0.2,
+  [WeaponType.EnergyBlade]: 0.3,
+  [WeaponType.Bow]: 0.35,
+  [WeaponType.Sword]: 0.45,
+  [WeaponType.Staff]: 0.5,
+  [WeaponType.Spear]: 0.6,
+  [WeaponType.Shield]: 0.65,
+  [WeaponType.Axe]: 0.75,
+  [WeaponType.Hammer]: 1
+};
+
+function deriveStats(song: Song, weapon: WeaponType): CombatStats {
   const { energy, tempo, acousticness } = song.characteristics;
+  const weight = WEAPON_WEIGHT[weapon];
+
+  // heavier weapons hit harder but swing slower - damage and speed move opposite ways
+  const damageMultiplier = 0.7 + weight;
+  const speedMultiplier = 1.3 - weight;
 
   return {
     maxHealth: Math.round(150 - energy * 70),
     health: Math.round(150 - energy * 70),
-    attackDamage: Math.round(6 + energy * 14),
-    attackSpeed: Math.round((0.6 + tempo) * 100) / 100,
+    attackDamage: Math.round((6 + energy * 14) * damageMultiplier),
+    attackSpeed: Math.round((0.6 + tempo) * speedMultiplier * 100) / 100,
     movementSpeed: Math.round(100 + tempo * 100),
     defense: Math.round(clamp01(0.45 - energy * 0.4) * 100) / 100,
     specialAbilityCooldown: Math.round((15 - tempo * 8) * 10) / 10
@@ -88,7 +107,7 @@ export function generateCharacter(song: Song): Character {
   const ability = pick(ABILITIES_BY_MOOD[mood], random);
   const { color, secondaryColor } = deriveColors(mood, danceability, valence, random);
   const size = Math.round((0.85 + random() * 0.3) * 100) / 100;
-  const stats = deriveStats(song);
+  const stats = deriveStats(song, weapon);
 
   return {
     id: song.id,

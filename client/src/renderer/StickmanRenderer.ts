@@ -1,6 +1,6 @@
 import * as PIXI from 'pixi.js';
-import { Character, WeaponType } from '../../shared/types/Character';
-import { Arena } from '../../shared/types/Arena';
+import { Character, WeaponType } from '../../../shared/types/Character';
+import { Arena } from '../../../shared/types/Arena';
 
 const { Container, Graphics, Text } = PIXI;
 

@@ -2,9 +2,9 @@ import * as PIXI from 'pixi.js';
 import { BattleManager } from './game/systems/BattleManager';
 import { StickmanRenderer } from './renderer/StickmanRenderer';
 import { ArenaScene } from './game/scenes/ArenaScene';
-import { placeholderCharacters } from './game/systems/placeholderData';
+import { showStartScreen, ImportResult } from './ui/StartScreen';
 
-function main() {
+function startBattle(result: ImportResult) {
   // Initialize PixiJS application (v7 synchronous)
   const app = new PIXI.Application({
     width: window.innerWidth,
@@ -20,7 +20,7 @@ function main() {
   // Create game systems
   const arenaScene = new ArenaScene(app.stage);
   const renderer = new StickmanRenderer(app.stage);
-  const battleManager = new BattleManager(placeholderCharacters());
+  const battleManager = new BattleManager(result.characters, result.arena);
 
   // Handle winner
   battleManager.setOnWinnerAnnounced((winner) => {
@@ -41,6 +41,7 @@ function main() {
           <h2 style="font-size: 36px; margin-bottom: 10px;">${winner.song.title}</h2>
           <p style="font-size: 24px; color: #aaa;">${winner.song.artist}</p>
           <p style="font-size: 18px; color: #888; margin-top: 20px;">Kills: ${winner.kills}</p>
+          ${winner.song.spotifyUrl ? `<p style="margin-top: 15px;"><a href="${winner.song.spotifyUrl}" target="_blank" style="color: #1DB954; font-size: 18px;">Listen on Spotify</a></p>` : ''}
           <button onclick="location.reload()" style="
             margin-top: 30px;
             padding: 15px 30px;
@@ -74,4 +75,4 @@ function main() {
   });
 }
 
-main();
+showStartScreen(startBattle);

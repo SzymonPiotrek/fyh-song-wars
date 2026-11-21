@@ -1,5 +1,5 @@
-import { Character } from '../../../shared/types/Character';
-import { Arena, ArenaTheme } from '../../../shared/types/Arena';
+import { Character } from '../../../../shared/types/Character';
+import { Arena, ArenaTheme } from '../../../../shared/types/Arena';
 import { CombatSystem } from './CombatSystem';
 import { CharacterAI } from './CharacterAI';
 import { PhysicsSystem } from './PhysicsSystem';
@@ -14,20 +14,37 @@ export class BattleManager {
   private winner: Character | null = null;
   private onWinnerAnnounced?: (winner: Character) => void;
 
-  constructor(initialCharacters: Character[]) {
+  constructor(initialCharacters: Character[], arena?: Arena) {
     this.characters = initialCharacters;
     this.combatSystem = new CombatSystem();
     this.characterAI = new CharacterAI(this.combatSystem);
     this.physicsSystem = new PhysicsSystem();
 
-    // Create default arena
     const width = window.innerWidth;
     const height = window.innerHeight;
-    this.arena = this.createDefaultArena(width, height);
+    this.arena = arena ? this.rescaleArena(arena, width, height) : this.createDefaultArena(width, height);
     this.physicsSystem.setArena(this.arena);
 
     // Spawn characters at random positions
     this.spawnCharacters(width, height);
+  }
+
+  private rescaleArena(arena: Arena, width: number, height: number): Arena {
+    const scaleX = width / arena.width;
+    const scaleY = height / arena.height;
+
+    return {
+      ...arena,
+      width,
+      height,
+      obstacles: arena.obstacles.map(obstacle => ({
+        ...obstacle,
+        x: obstacle.x * scaleX,
+        y: obstacle.y * scaleY,
+        width: obstacle.width * scaleX,
+        height: obstacle.height * scaleY
+      }))
+    };
   }
 
   private createDefaultArena(width: number, height: number): Arena {

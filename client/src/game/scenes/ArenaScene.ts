@@ -1,5 +1,5 @@
 import * as PIXI from 'pixi.js';
-import { Arena } from '../../../shared/types/Arena';
+import { Arena } from '../../../../shared/types/Arena';
 
 const { Container, Graphics } = PIXI;
 
@@ -23,6 +23,9 @@ export class ArenaScene {
 
     // Grid pattern
     this.drawGrid(arena);
+
+    // Obstacles
+    this.drawObstacles(arena);
 
     // Border
     const borderColor = parseInt(arena.colors.accent.replace('#', ''), 16);
@@ -51,6 +54,17 @@ export class ArenaScene {
     rightBorder.drawRect(arena.width - borderWidth, 0, borderWidth, arena.height);
     rightBorder.endFill();
     this.container.addChild(rightBorder);
+  }
+
+  private drawObstacles(arena: Arena) {
+    for (const obstacle of arena.obstacles) {
+      const graphic = new Graphics();
+      const color = parseInt(obstacle.color.replace('#', ''), 16);
+      graphic.beginFill(color, obstacle.type === 'hazard' ? 0.8 : 0.6);
+      graphic.drawRoundedRect(obstacle.x, obstacle.y, obstacle.width, obstacle.height, 8);
+      graphic.endFill();
+      this.container.addChild(graphic);
+    }
   }
 
   private drawGrid(arena: Arena) {

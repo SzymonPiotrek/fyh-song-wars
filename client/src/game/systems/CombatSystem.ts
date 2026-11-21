@@ -1,4 +1,4 @@
-import { Character } from '../../../shared/types/Character';
+import { Character } from '../../../../shared/types/Character';
 
 export class CombatSystem {
   private attackRange = 60;
