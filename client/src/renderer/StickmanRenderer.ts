@@ -1,4 +1,5 @@
 import * as PIXI from 'pixi.js';
+import * as Matter from 'matter-js';
 import { Character, WeaponType } from '../../../shared/types/Character';
 import { Arena } from '../../../shared/types/Arena';
 import { Mood } from '../../../shared/types/Song';
@@ -40,7 +41,7 @@ export class StickmanRenderer {
     stage.addChild(this.container);
   }
 
-  render(characters: Character[], arena: Arena, delta: number = 1) {
+  render(characters: Character[], arena: Arena, delta: number = 1, isEntrance: boolean = false, ragdollParts?: Map<string, Matter.Body[]>) {
     this.container.removeChildren();
 
     // Draw arena background
@@ -52,9 +53,113 @@ export class StickmanRenderer {
     for (const character of characters) {
       if (!character.alive) continue;
 
-      const charContainer = this.drawStickman(character, deltaSeconds);
-      this.container.addChild(charContainer);
+      if (isEntrance && ragdollParts && ragdollParts.has(character.id)) {
+        // Draw ragdoll during entrance
+        const parts = ragdollParts.get(character.id)!;
+        const charContainer = this.drawRagdoll(character, parts);
+        this.container.addChild(charContainer);
+      } else {
+        const charContainer = this.drawStickman(character, deltaSeconds);
+        this.container.addChild(charContainer);
+      }
     }
+  }
+
+  /**
+   * Draw a character as a ragdoll during the entrance animation.
+   * Each body part is drawn as a stickman limb following the physics bodies.
+   */
+  private drawRagdoll(character: Character, parts: Matter.Body[]): PIXI.Container {
+    const container = new Container();
+    container.scale.set(character.size * BASE_SCALE);
+
+    const color = parseInt(character.color.replace('#', ''), 16);
+    const g = new Graphics();
+
+    // parts order: [head, torso, leftUpperArm, rightUpperArm, leftForearm, rightForearm, leftUpperLeg, rightUpperLeg, leftLowerLeg, rightLowerLeg]
+    if (parts.length >= 10) {
+      const [head, torso, lUpperArm, rUpperArm, lForearm, rForearm, lUpperLeg, rUpperLeg, lLowerLeg, rLowerLeg] = parts;
+
+      // Draw connections between body parts as lines (limbs)
+      g.lineStyle(3.5, color);
+
+      // Head
+      g.beginFill(color);
+      g.lineStyle(2, 0xffffff);
+      g.drawCircle(head.position.x, head.position.y, 11);
+      g.endFill();
+
+      // Torso (line from neck to hips)
+      g.moveTo(torso.position.x, torso.position.y - 10);
+      g.lineTo(torso.position.x, torso.position.y + 10);
+
+      // Left arm: shoulder -> elbow -> hand
+      g.moveTo(torso.position.x, torso.position.y - 10);
+      g.lineTo(lUpperArm.position.x, lUpperArm.position.y);
+      g.lineTo(lForearm.position.x, lForearm.position.y);
+
+      // Right arm: shoulder -> elbow -> hand
+      g.moveTo(torso.position.x, torso.position.y - 10);
+      g.lineTo(rUpperArm.position.x, rUpperArm.position.y);
+      g.lineTo(rForearm.position.x, rForearm.position.y);
+
+      // Left leg: hip -> knee -> foot
+      g.moveTo(torso.position.x, torso.position.y + 10);
+      g.lineTo(lUpperLeg.position.x, lUpperLeg.position.y);
+      g.lineTo(lLowerLeg.position.x, lLowerLeg.position.y);
+
+      // Right leg: hip -> knee -> foot
+      g.moveTo(torso.position.x, torso.position.y + 10);
+      g.lineTo(rUpperLeg.position.x, rUpperLeg.position.y);
+      g.lineTo(rLowerLeg.position.x, rLowerLeg.position.y);
+
+      // Draw joints
+      g.beginFill(color);
+      g.drawCircle(lUpperArm.position.x, lUpperArm.position.y, 1.5);
+      g.drawCircle(rUpperArm.position.x, rUpperArm.position.y, 1.5);
+      g.drawCircle(lUpperLeg.position.x, lUpperLeg.position.y, 1.5);
+      g.drawCircle(rUpperLeg.position.x, rUpperLeg.position.y, 1.5);
+      g.endFill();
+
+      // Set container position to torso position for health bar / name
+      container.x = torso.position.x;
+      container.y = torso.position.y;
+    }
+
+    container.addChild(g);
+
+    // Health bar
+    const healthPercent = character.stats.health / character.stats.maxHealth;
+    const healthBarWidth = 40;
+    const healthBarHeight = 4;
+    const healthBarY = -58;
+
+    const hbBg = new Graphics();
+    hbBg.beginFill(0x333333);
+    hbBg.drawRect(-healthBarWidth / 2, healthBarY, healthBarWidth, healthBarHeight);
+    hbBg.endFill();
+    container.addChild(hbBg);
+
+    const hbFill = new Graphics();
+    const fillWidth = healthBarWidth * healthPercent;
+    const healthColor = healthPercent > 0.5 ? 0x00ff00 : healthPercent > 0.25 ? 0xffff00 : 0xff0000;
+    hbFill.beginFill(healthColor);
+    hbFill.drawRect(-healthBarWidth / 2, healthBarY, fillWidth, healthBarHeight);
+    hbFill.endFill();
+    container.addChild(hbFill);
+
+    // Name label
+    const nameText = new Text(character.song.title, {
+      fontSize: 10,
+      fill: '#ffffff',
+      fontWeight: 'bold'
+    });
+    nameText.anchor.set(0.5, 0);
+    nameText.x = 0;
+    nameText.y = -63;
+    container.addChild(nameText);
+
+    return container;
   }
 
   private drawArena(arena: Arena) {
@@ -296,13 +401,10 @@ export class StickmanRenderer {
     container.addChild(hbFill);
 
     // Name label
-    const nameText = new Text({
-      text: character.song.title,
-      style: {
-        fontSize: 10,
-        fill: '#ffffff',
-        fontWeight: 'bold'
-      }
+    const nameText = new Text(character.song.title, {
+      fontSize: 10,
+      fill: '#ffffff',
+      fontWeight: 'bold'
     });
     nameText.anchor.set(0.5, 0);
     nameText.x = 0;
@@ -329,7 +431,7 @@ export class StickmanRenderer {
     }
   }
 
-  private drawWeapon(g: Graphics, character: Character, x: number, y: number, color: number) {
+  private drawWeapon(g: PIXI.Graphics, character: Character, x: number, y: number, color: number) {
     const weaponLen = this.getWeaponLength(character.weapon);
 
     switch (character.weapon) {

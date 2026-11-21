@@ -1,3 +1,4 @@
+import 'dotenv/config';
 import express, { Request, Response } from 'express';
 import playlistRouter from './routes/playlist';
 import authRouter, { handleCallback } from './routes/auth';

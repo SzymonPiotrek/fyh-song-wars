@@ -15,7 +15,7 @@ function startBattle(result: ImportResult) {
     autoDensity: true
   });
 
-  document.getElementById('game-container')?.appendChild(app.view as HTMLElement);
+  document.getElementById('game-container')?.appendChild(app.view as unknown as HTMLElement);
 
   // Create game systems
   const arenaScene = new ArenaScene(app.stage);
@@ -70,8 +70,17 @@ function startBattle(result: ImportResult) {
   // Game loop
   app.ticker.add((delta) => {
     battleManager.update(delta);
-    renderer.render(battleManager.getCharacters(), battleManager.getArena(), delta);
-    arenaScene.render(battleManager.getArena());
+
+    const phase = battleManager.getPhase();
+    const isEntrance = phase === 'entrance';
+
+    // Render characters (ragdoll during entrance, normal during fight)
+    const entranceAnim = battleManager.getEntranceAnimation();
+    const ragdollParts = isEntrance ? entranceAnim.getRagdollPartsMap() : undefined;
+    renderer.render(battleManager.getCharacters(), battleManager.getArena(), delta, isEntrance, ragdollParts);
+
+    // Render arena (with chute during entrance)
+    arenaScene.render(battleManager.getArena(), false, isEntrance);
   });
 }
 

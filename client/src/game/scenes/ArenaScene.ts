@@ -1,17 +1,20 @@
 import * as PIXI from 'pixi.js';
 import { Arena } from '../../../../shared/types/Arena';
 
-const { Container, Graphics } = PIXI;
+const { Container, Graphics, Text } = PIXI;
 
 export class ArenaScene {
   private container: PIXI.Container;
+  private chuteContainer: PIXI.Container | null = null;
+  private chuteOpen: boolean = false;
+  private chuteTimer: number = 0;
 
   constructor(stage: PIXI.Container) {
     this.container = new Container();
     stage.addChild(this.container);
   }
 
-  render(arena: Arena) {
+  render(arena: Arena, showChute: boolean = false, entrancePhase: boolean = false) {
     this.container.removeChildren();
 
     // Background
@@ -54,6 +57,77 @@ export class ArenaScene {
     rightBorder.drawRect(arena.width - borderWidth, 0, borderWidth, arena.height);
     rightBorder.endFill();
     this.container.addChild(rightBorder);
+
+    // Draw chute during entrance phase
+    if (entrancePhase) {
+      this.drawChute(arena);
+    }
+  }
+
+  private drawChute(arena: Arena) {
+    const chuteX = arena.width / 2;
+    const chuteY = -10;
+    const chuteWidth = 120;
+    const chuteHeight = 60;
+
+    const chute = new Container();
+
+    // Chute structure - metal platform
+    const platform = new Graphics();
+    platform.beginFill(0x444466);
+    platform.lineStyle(3, 0x8888aa);
+
+    // Top platform
+    platform.drawRect(chuteX - chuteWidth / 2 - 20, chuteY - 30, chuteWidth + 40, 15);
+
+    // Side walls
+    platform.drawRect(chuteX - chuteWidth / 2 - 20, chuteY - 30, 15, chuteHeight + 30);
+    platform.drawRect(chuteX + chuteWidth / 2 + 5, chuteY - 30, 15, chuteHeight + 30);
+
+    // Bottom opening (hatch)
+    const hatchOpen = Math.min(1, this.chuteTimer / 1000); // Opens over 1 second
+
+    // Left hatch door
+    const leftHatch = new Graphics();
+    leftHatch.beginFill(0x555577);
+    leftHatch.lineStyle(2, 0x8888aa);
+    const hatchAngle = hatchOpen * Math.PI / 2;
+    leftHatch.rotation = -hatchAngle;
+    leftHatch.drawRect(chuteX - chuteWidth / 2, chuteY + chuteHeight, chuteWidth / 2, 8);
+    chute.addChild(leftHatch);
+
+    // Right hatch door
+    const rightHatch = new Graphics();
+    rightHatch.beginFill(0x555577);
+    rightHatch.lineStyle(2, 0x8888aa);
+    rightHatch.rotation = hatchAngle;
+    rightHatch.drawRect(chuteX + chuteWidth / 2, chuteY + chuteHeight, chuteWidth / 2, 8);
+    chute.addChild(rightHatch);
+
+    chute.addChild(platform);
+
+    // "DROP!" text
+    const dropText = new Text('⚡ DROP! ⚡', {
+      fontSize: 16,
+      fill: '#ffaa00',
+      fontWeight: 'bold',
+      fontFamily: 'Orbitron, Arial, sans-serif'
+    });
+    dropText.anchor.set(0.5, 0.5);
+    dropText.x = chuteX;
+    dropText.y = chuteY - 15;
+    dropText.alpha = 0.5 + Math.sin(Date.now() / 200) * 0.3;
+    chute.addChild(dropText);
+
+    // Glow effect under chute
+    const glow = new Graphics();
+    glow.beginFill(0xffaa00, 0.1 + hatchOpen * 0.15);
+    glow.drawCircle(chuteX, chuteY + chuteHeight / 2, 50 + hatchOpen * 20);
+    glow.endFill();
+    chute.addChild(glow);
+
+    this.container.addChild(chute);
+    this.chuteTimer += 16; // ~60fps increment
   }
 
   private drawObstacles(arena: Arena) {
