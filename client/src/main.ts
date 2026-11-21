@@ -3,6 +3,8 @@ import { BattleManager } from './game/systems/BattleManager';
 import { StickmanRenderer } from './renderer/StickmanRenderer';
 import { ArenaScene } from './game/scenes/ArenaScene';
 import { showStartScreen, ImportResult } from './ui/StartScreen';
+import { createCommentator } from './ui/Commentator';
+import { CommentaryTracker, toCommentarySongInfo } from './game/systems/CommentaryTracker';
 
 function startBattle(result: ImportResult) {
   // Initialize PixiJS application (v7 synchronous)
@@ -21,10 +23,13 @@ function startBattle(result: ImportResult) {
   const arenaScene = new ArenaScene(app.stage);
   const renderer = new StickmanRenderer(app.stage);
   const battleManager = new BattleManager(result.characters, result.arena);
+  const commentaryTracker = new CommentaryTracker(result.relationships);
+  const commentator = createCommentator(document.getElementById('ui-overlay')!);
 
   // Handle winner
   battleManager.setOnWinnerAnnounced((winner) => {
     console.log('🏆 Winner:', winner.song.title, 'by', winner.song.artist);
+    commentator.react({ type: 'winner', winner: toCommentarySongInfo(winner), kills: winner.kills });
     const overlay = document.getElementById('ui-overlay');
     if (overlay) {
       overlay.innerHTML = `
@@ -70,7 +75,6 @@ function startBattle(result: ImportResult) {
   // Game loop
   app.ticker.add((delta) => {
     battleManager.update(delta);
-
     const phase = battleManager.getPhase();
     const isEntrance = phase === 'entrance';
 
@@ -81,6 +85,9 @@ function startBattle(result: ImportResult) {
 
     // Render arena (with chute during entrance)
     arenaScene.render(battleManager.getArena(), false, isEntrance);
+
+    const events = commentaryTracker.update(battleManager.getCharacters(), delta / 60);
+    events.forEach(event => commentator.react(event));
   });
 }
 

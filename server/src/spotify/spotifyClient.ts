@@ -1,4 +1,4 @@
-import { getUserAccessToken } from './spotifyAuth';
+import { getAppAccessToken } from './spotifyAuth';
 
 const API_BASE = 'https://api.spotify.com/v1';
 
@@ -52,7 +52,7 @@ export interface RawPlaylistData {
 }
 
 async function spotifyFetch<T>(url: string): Promise<T> {
-  const token = await getUserAccessToken();
+  const token = await getAppAccessToken();
 
   const response = await fetch(url, {
     headers: { Authorization: `Bearer ${token}` }
@@ -82,7 +82,7 @@ export async function fetchPlaylist(playlistUrlOrId: string): Promise<RawPlaylis
   );
 
   if (!playlist.items) {
-    throw new Error('No track data available for this playlist. You must own it or collaborate on it to see its songs.');
+    throw new Error('No track data available for this playlist. Make sure it is set to public.');
   }
 
   const tracks: SpotifyTrack[] = [];

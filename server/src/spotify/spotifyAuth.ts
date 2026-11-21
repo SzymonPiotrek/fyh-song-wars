@@ -1,31 +1,9 @@
-import { mkdirSync, readFileSync, writeFileSync } from 'fs';
-import path from 'path';
-
-const REDIRECT_URI = 'http://127.0.0.1:3001/callback';
-const SCOPES = 'playlist-read-private playlist-read-collaborative';
-const TOKENS_PATH = path.resolve('server/data/spotify-tokens.json');
-
-interface UserTokens {
+interface AppToken {
   accessToken: string;
-  refreshToken: string;
   expiresAt: number;
 }
 
-function loadTokensFromDisk(): UserTokens | null {
-  try {
-    return JSON.parse(readFileSync(TOKENS_PATH, 'utf-8'));
-  } catch {
-    return null;
-  }
-}
-
-function saveTokensToDisk(tokens: UserTokens) {
-  mkdirSync(path.dirname(TOKENS_PATH), { recursive: true });
-  writeFileSync(TOKENS_PATH, JSON.stringify(tokens));
-}
-
-// Single-user hackathon scope: one logged-in Spotify account at a time.
-let userTokens: UserTokens | null = loadTokensFromDisk();
+let appToken: AppToken | null = null;
 
 function getClientCredentials(): { clientId: string; clientSecret: string } {
   const clientId = process.env.SPOTIFY_CLIENT_ID;
@@ -38,21 +16,7 @@ function getClientCredentials(): { clientId: string; clientSecret: string } {
   return { clientId, clientSecret };
 }
 
-export function getLoginUrl(state: string): string {
-  const { clientId } = getClientCredentials();
-
-  const params = new URLSearchParams({
-    response_type: 'code',
-    client_id: clientId,
-    scope: SCOPES,
-    redirect_uri: REDIRECT_URI,
-    state
-  });
-
-  return `https://accounts.spotify.com/authorize?${params.toString()}`;
-}
-
-export async function exchangeCodeForTokens(code: string): Promise<void> {
+async function fetchAppToken(): Promise<void> {
   const { clientId, clientSecret } = getClientCredentials();
   const credentials = Buffer.from(`${clientId}:${clientSecret}`).toString('base64');
 
@@ -62,73 +26,26 @@ export async function exchangeCodeForTokens(code: string): Promise<void> {
       Authorization: `Basic ${credentials}`,
       'Content-Type': 'application/x-www-form-urlencoded'
     },
-    body: new URLSearchParams({
-      grant_type: 'authorization_code',
-      code,
-      redirect_uri: REDIRECT_URI
-    })
+    body: new URLSearchParams({ grant_type: 'client_credentials' })
   });
 
   if (!response.ok) {
     const body = await response.text();
-    throw new Error(`Spotify token exchange failed (${response.status}): ${body}`);
+    throw new Error(`Spotify app token request failed (${response.status}): ${body}`);
   }
 
-  const data = await response.json() as { access_token: string; refresh_token: string; expires_in: number };
+  const data = await response.json() as { access_token: string; expires_in: number };
 
-  userTokens = {
+  appToken = {
     accessToken: data.access_token,
-    refreshToken: data.refresh_token,
     expiresAt: Date.now() + (data.expires_in - 60) * 1000
   };
-  saveTokensToDisk(userTokens);
 }
 
-async function refreshAccessToken(): Promise<void> {
-  if (!userTokens) throw new Error('Not logged in to Spotify');
-
-  const { clientId, clientSecret } = getClientCredentials();
-  const credentials = Buffer.from(`${clientId}:${clientSecret}`).toString('base64');
-
-  const response = await fetch('https://accounts.spotify.com/api/token', {
-    method: 'POST',
-    headers: {
-      Authorization: `Basic ${credentials}`,
-      'Content-Type': 'application/x-www-form-urlencoded'
-    },
-    body: new URLSearchParams({
-      grant_type: 'refresh_token',
-      refresh_token: userTokens.refreshToken
-    })
-  });
-
-  if (!response.ok) {
-    const body = await response.text();
-    throw new Error(`Spotify token refresh failed (${response.status}): ${body}`);
+export async function getAppAccessToken(): Promise<string> {
+  if (!appToken || Date.now() >= appToken.expiresAt) {
+    await fetchAppToken();
   }
 
-  const data = await response.json() as { access_token: string; refresh_token?: string; expires_in: number };
-
-  userTokens = {
-    accessToken: data.access_token,
-    refreshToken: data.refresh_token ?? userTokens.refreshToken,
-    expiresAt: Date.now() + (data.expires_in - 60) * 1000
-  };
-  saveTokensToDisk(userTokens);
-}
-
-export function isLoggedIn(): boolean {
-  return userTokens !== null;
-}
-
-export async function getUserAccessToken(): Promise<string> {
-  if (!userTokens) {
-    throw new Error('Not logged in to Spotify. Visit /api/auth/login first.');
-  }
-
-  if (Date.now() >= userTokens.expiresAt) {
-    await refreshAccessToken();
-  }
-
-  return userTokens!.accessToken;
+  return appToken!.accessToken;
 }
